@@ -39,8 +39,7 @@ MNTL_NODE = os.environ.get("STAKETAX_MNTL_NODE", "https://rest.assetmantle.one")
 NLS_NODE = os.environ.get("STAKETAX_NLS_NODE", "https://pirin-cl-arc.nolus.network:1317")
 NTRN_NODE = os.environ.get("STAKETAX_NTRN_NODE", "https://neutron-api.lavenderfive.com")
 OSMO_NODE = os.environ.get("STAKETAX_OSMO_NODE", "https://lcd.osmosis.zone")
-# ORAI_NODE = os.environ.get("STAKETAX_ORAI_NODE", "https://lcd.orai.io")
-ORAI_NODE = os.environ.get("STAKETAX_ORAI_NODE", "https://oraichain-rest.publicnode.com")
+ORAI_NODE = os.environ.get("STAKETAX_ORAI_NODE", "https://lcd.orai.io")
 REGEN_NODE = os.environ.get("STAKETAX_REGEN_NODE", "")
 ROWAN_NODE = os.environ.get("STAKETAX_ROWAN_NODE", "")
 SAGA_NODE = os.environ.get("STAKETAX_SAGA_NODE", "https://saga-api.polkachu.com")
@@ -108,3 +107,5 @@ MESSAGE_ADDRESS_NOT_FOUND = "Wallet address not found"
 MESSAGE_STAKING_ADDRESS_FOUND = "Staking address found.  Please input the main wallet address instead."
 
 REPORTS_DIR = os.path.join(os.path.dirname(os.path.realpath(__file__)), "_reports")
+
+CRYPTACT_UNSUPPORTED_COINS = os.environ.get("STAKETAX_CRYPTACT_UNSUPPORTED_COINS", "")
