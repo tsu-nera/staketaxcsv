@@ -11,7 +11,7 @@ import pytz
 from pytz import timezone
 from staketaxcsv.common import ExporterTypes as et
 from staketaxcsv.common.exporter_koinly import NullMap
-from staketaxcsv.settings_csv import TICKER_ALGO, TICKER_LUNA1, TICKER_LUNA2, TICKER_OSMO
+from staketaxcsv.settings_csv import TICKER_ALGO, TICKER_LUNA1, TICKER_LUNA2, TICKER_OSMO, CRYPTACT_UNSUPPORTED_COINS
 from tabulate import tabulate
 from staketaxcsv.luna1.constants import EXCHANGE_TERRA_CLASSIC_BLOCKCHAIN
 
@@ -334,6 +334,8 @@ class Exporter:
             self.export_tokentax_csv(csvpath)
         elif csvformat == et.FORMAT_ZENLEDGER:
             self.export_zenledger_csv(csvpath)
+        elif csvformat == et.FORMAT_CRYPTACT:
+            self.export_cryptact_csv(csvpath)
         else:
             raise Exception("export_format(): Unknown csvformat={}".format(csvformat))
 
@@ -1891,3 +1893,152 @@ class Exporter:
                     new_cur = old_cur[3:]  # Strip off "all"
                     row.comment += f" [{old_cur} converted to {new_cur}]"  # e.g. " [allBTC]"
                     setattr(row, attr, new_cur)
+
+    def export_cryptact_csv(self, csvpath):
+        """ Write CSV, suitable for import into Cryptact """
+        cryptact_actions = {
+            et.TX_TYPE_STAKING: "BONUS",  # リワードはBONUS
+            et.TX_TYPE_AIRDROP: "BONUS",
+            et.TX_TYPE_INCOME: "BONUS",
+            et.TX_TYPE_SPEND: "LOSS",     # 支出はLOSS
+            et.TX_TYPE_BORROW: "BORROW",  # 借入はBORROW
+            et.TX_TYPE_REPAY: "REPAY",    # 返済はREPAY
+            et.TX_TYPE_LP_DEPOSIT: "DEPOSIT",  # LPの預入はDEPOSIT
+            et.TX_TYPE_LP_WITHDRAW: "WITHDRAW",  # LPの引出はWITHDRAW
+            et.TX_TYPE_UNKNOWN: "UNKNOWN",
+        }
+        rows = self._rows_export(et.FORMAT_CRYPTACT, export_all=True)
+
+        with open(csvpath, 'w', newline='', encoding='utf-8') as f:
+            mywriter = csv.writer(f)
+
+            # header row
+            mywriter.writerow(et.CRYPTACT_FIELDS)
+
+            # data rows
+            for row in rows:
+                # Determine action
+
+                if row.tx_type == et.TX_TYPE_TRADE:
+                    # TRADEの場合、received_amountがある場合はBUY、sent_amountがある場合はSELL
+                    if row.received_amount and not row.sent_amount:
+                        action = "BUY"
+                    elif row.sent_amount and not row.received_amount:
+                        action = "SELL" 
+                    else:
+                        # 両方ある場合はBUY
+                        action = "BUY"
+                elif row.tx_type == et.TX_TYPE_TRANSFER:
+                    # TRANSFERの場合、received_amountがある場合はBONUS、sent_amountがある場合はLOSS
+                    if row.received_amount and not row.sent_amount:
+                        action = "BONUS"
+                    else:
+                        action = "LOSS"
+                elif row.tx_type == et.TX_TYPE_UNKNOWN:
+                    # UNKNOWNの場合、received_amountがある場合はBONUS、sent_amountがある場合はLOSS
+                    if row.received_amount and not row.sent_amount:
+                        action = "BONUS"
+                    elif row.sent_amount and not row.received_amount:
+                        action = "LOSS"
+                    elif not row.sent_amount and not row.received_amount:
+                        # spam transaction
+                        continue
+                    else:
+                        action = "UNKNOWN"
+                else:
+                    action = cryptact_actions.get(row.tx_type, "UNKNOWN")
+
+                # Determine source
+                source = row.exchange.replace("_blockchain", "")
+
+                if action in ["BUY", "BONUS", "DEPOSIT", "BORROW"]:
+                    base = row.received_currency
+                    base_volume = row.received_amount
+                    counter = row.sent_currency
+                    counter_volume = row.sent_amount
+                else:
+                    base = row.sent_currency
+                    base_volume = row.sent_amount
+                    counter = row.received_currency
+                    counter_volume = row.received_amount
+                
+                # クリプタクト未対応コインの場合はカスタムコインを作成
+                cryptact_unsupported_coins = str.split(CRYPTACT_UNSUPPORTED_COINS ,",") 
+                if base in cryptact_unsupported_coins:
+                    base = self._generate_cryptact_custom_coin(base)
+                if counter in cryptact_unsupported_coins:
+                    counter = self._generate_cryptact_custom_coin(counter)       
+
+                # Symbolに解決できないaddressがある場合はprefixでUSERをつける
+                if len(base) > 20:  # 20は仮の数. また未知のtokenは必ずbaseに来る前提
+                    base = self._generate_cryptact_custom_coin(base)
+                if len(counter) > 20: 
+                    counter = self._generate_cryptact_custom_coin(counter)
+                    
+                # baseがcustom coinでなく、counterがcustom coinの場合はBUYとSELLを反転する
+                if not self._is_cryptact_custom_coin(base) and self._is_cryptact_custom_coin(counter):
+                    if action == "SELL":
+                       action = "BUY"
+                       _counter = counter   
+                       counter = base
+                       base = _counter
+                       _base_volume = base_volume
+                       base_volume = counter_volume
+                       counter_volume = _base_volume
+                    else:
+                       action = "SELL"
+                       _counter = counter   
+                       counter = base
+                       base = _counter
+                       _base_volume = base_volume
+                       base_volume = counter_volume
+                       counter_volume = _base_volume
+    
+                price = ""
+                # Calculate price if both sent and received amounts exist
+                if action == "BUY" or action == "SELL":
+                    if counter_volume and base_volume:
+                        price = float(counter_volume) / float(base_volume)
+            
+                comment = row.comment + " " + row.url
+                
+                if action in ["BONUS", "LOSS"]:
+                    # feeは法定通貨のみ対応のため、feeを0とする/fee_currencyをJPYとする   
+                    row.fee_currency = "JPY"
+                    # もしcounterがない場合はcounterを"USD"とする
+                    if not counter:
+                      counter = "USD"
+
+                def _write_line(timestamp, action, source, base, volume, price, counter, fee, fee_currency, comment):
+                    # Timestamp,Action,Source,Base,Volume,Price,Counter,Fee,FeeCcy,Comment
+                    line = [
+                        timestamp,          # Timestamp
+                        action,                 # Action
+                        source,                 # Source
+                        base,                   # Base
+                        volume,                 # Volume
+                        price,                  # Price
+                        counter,                # Counter
+                        fee,                    # Fee
+                        fee_currency,           # FeeCcy
+                        comment,                # Comment
+                    ]
+                    mywriter.writerow(line)
+
+                # もしBUY/SELLでbase/counterが共にcustom coinの場合は取引を２つに分けて記録する
+                if self._is_cryptact_custom_coin(base) and self._is_cryptact_custom_coin(counter):
+                    # 取引を２つに分けて記録する
+                    _write_line(row.timestamp, "BONUS", source, base, base_volume, "", "USD", 0, "JPY", comment)
+                    _write_line(row.timestamp, "LOSS", source, counter, counter_volume, "", "USD", 0, "JPY", comment)
+                else:
+                    # 取引を１つに記録する
+                    _write_line(row.timestamp, action, source, base, base_volume, price, counter, row.fee, row.fee_currency, comment)
+
+        logging.info("Wrote to %s", csvpath)
+        
+    def _generate_cryptact_custom_coin(self, token_name):
+        short_name = token_name.split("/")[-1]
+        return "USER-" + str.upper(short_name)
+
+    def _is_cryptact_custom_coin(self, token_name):
+        return token_name.startswith("USER-")
