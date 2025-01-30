@@ -28,6 +28,7 @@ import staketaxcsv.report_mntl
 import staketaxcsv.report_nls
 import staketaxcsv.report_ntrn
 import staketaxcsv.report_osmo
+import staketaxcsv.report_orai
 import staketaxcsv.report_regen
 import staketaxcsv.report_rowan
 import staketaxcsv.report_saga
@@ -64,6 +65,7 @@ REPORT_MODULES = {
     co.TICKER_NLS: staketaxcsv.report_nls,
     co.TICKER_NTRN: staketaxcsv.report_ntrn,
     co.TICKER_OSMO: staketaxcsv.report_osmo,
+    co.TICKER_ORAI: staketaxcsv.report_orai, 
     co.TICKER_REGEN: staketaxcsv.report_regen,
     co.TICKER_ROWAN: staketaxcsv.report_rowan,
     co.TICKER_SAGA: staketaxcsv.report_saga,
