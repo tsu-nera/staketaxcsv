@@ -124,33 +124,8 @@ def _handle_oraidex_swap(exporter, txinfo, message, events):
     """Handle OraiDEX swap transaction"""
     msg = message.get('msg', {})
     
-    # Check for execute_swap_operations
-    if 'execute_swap_operations' in msg:
-        operations = msg.get('execute_swap_operations', {}).get('operations', [])
-        for operation in operations:
-            if 'orai_swap' in operation:
-                swap = operation['orai_swap']
-                offer_asset = swap.get('offer_asset_info', {})
-                ask_asset = swap.get('ask_asset_info', {})
-                
-                offer_denom = offer_asset.get('native_token', {}).get('denom') or offer_asset.get('token', {}).get('contract_addr')
-                ask_denom = ask_asset.get('native_token', {}).get('denom') or ask_asset.get('token', {}).get('contract_addr')
-                
-                for event in events:
-                    if event.get('type') == 'wasm':
-                        attrs = {attr['key']: attr['value'] for attr in event.get('attributes', [])}
-                        if 'offer_amount' in attrs and 'return_amount' in attrs:
-                            offer_amount, offer_currency = _parse_amount_currency(attrs['offer_amount'], offer_denom)
-                            return_amount, return_currency = _parse_amount_currency(attrs['return_amount'], ask_denom)
-                            
-                            if offer_amount > 0 and return_amount > 0:
-                                row = make_swap_tx(txinfo, return_amount, return_currency, offer_amount, offer_currency)
-                                row.comment = "OraiDEX Swap"
-                                exporter.ingest_row(row)
-                                return
-    
     # Check for swap_and_action
-    elif 'swap_and_action' in msg:
+    if 'swap_and_action' in msg:
         swap_info = msg.get('swap_and_action', {})
 
         input_denom = message.get('funds')[0].get('denom')
@@ -175,21 +150,6 @@ def _handle_oraidex_swap(exporter, txinfo, message, events):
                 row = make_swap_tx(txinfo, input_amount, input_currency, output_amount, output_currency)
                 row.comment = "OraiDEX Swap from " + input_currency + " to " + output_currency
                 exporter.ingest_row(row)
-                
-    # Check for simple swap
-    elif 'swap' in msg:
-        for event in events:
-            if event.get('type') == 'wasm':
-                attrs = {attr['key']: attr['value'] for attr in event.get('attributes', [])}
-                if 'offer_asset' in attrs and 'ask_asset' in attrs and 'offer_amount' in attrs and 'return_amount' in attrs:
-                    offer_amount, offer_currency = _parse_amount_currency(attrs['offer_amount'], attrs['offer_asset'])
-                    return_amount, return_currency = _parse_amount_currency(attrs['return_amount'], attrs['ask_asset'])
-                    
-                    if offer_amount > 0 and return_amount > 0:
-                        row = make_swap_tx(txinfo, offer_amount, offer_currency, return_amount, return_currency)
-                        row.comment = "OraiDEX Swap"
-                        exporter.ingest_row(row)
-                        return
 
 def _is_bridge_contract(message):
     """Check if the message is a bridge contract execution"""
