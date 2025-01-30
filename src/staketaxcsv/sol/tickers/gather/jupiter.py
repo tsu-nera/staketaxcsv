@@ -13,7 +13,7 @@ import os
 from datetime import datetime
 
 from staketaxcsv.sol.tickers.tickers import TOKEN_LISTS_DIR
-JUPITER_TOKENS_LIST_API = "https://token.jup.ag/strict"
+JUPITER_TOKENS_LIST_API = "https://tokens.jup.ag/tokens?tags=verified"
 
 
 def fetch_jupiter_tokens():
