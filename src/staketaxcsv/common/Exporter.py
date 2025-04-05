@@ -3,7 +3,7 @@ import io
 import logging
 import time
 import json
-from datetime import datetime
+from datetime import datetime, timedelta
 import copy
 
 import pandas as pd
@@ -2002,12 +2002,6 @@ class Exporter:
             
                 comment = row.comment + " " + row.url
                 
-                if action in ["BONUS", "LOSS"]:
-                    # feeは法定通貨のみ対応のため、feeを0とする/fee_currencyをJPYとする   
-                    row.fee_currency = "JPY"
-                    # もしcounterがない場合はcounterを"USD"とする
-                    if not counter:
-                      counter = "USD"
 
                 def _write_line(timestamp, action, source, base, volume, price, counter, fee, fee_currency, comment):
                     # Timestamp,Action,Source,Base,Volume,Price,Counter,Fee,FeeCcy,Comment
@@ -2027,9 +2021,17 @@ class Exporter:
 
                 # もしBUY/SELLでbase/counterが共にcustom coinの場合は取引を２つに分けて記録する
                 if self._is_cryptact_custom_coin(base) and self._is_cryptact_custom_coin(counter):
+                    if row.fee != '' and float(row.fee) > 0:
+                        _write_line(row.timestamp, "LOSS", source, row.fee_currency, row.fee, "", "JPY", 0, "JPY",  "Network Fee:" + comment)
                     # 取引を２つに分けて記録する
-                    _write_line(row.timestamp, "BONUS", source, base, base_volume, "", "USD", 0, "JPY", comment)
-                    _write_line(row.timestamp, "LOSS", source, counter, counter_volume, "", "USD", 0, "JPY", comment)
+                    _write_line(row.timestamp, "BONUS", source, base, base_volume, "", "JPY", 0, "JPY", comment)
+                    _write_line(row.timestamp, "LOSS", source, counter, counter_volume, "", "JPY", 0, "JPY", comment)
+                elif action in ["BONUS", "LOSS"]:
+                    # feeは法定通貨のみ対応のため2つの取引に分けて記録する
+                    # feeを0とする/fee_currencyをJPYとする   
+                    if row.fee != '' and float(row.fee) > 0:
+                        _write_line(row.timestamp, "LOSS", source, row.fee_currency, row.fee, "", "JPY", 0, "JPY",  "Network Fee:" + comment)
+                    _write_line(row.timestamp, action, source, base, base_volume, "", "JPY", 0, "JPY", comment)
                 else:
                     # 取引を１つに記録する
                     _write_line(row.timestamp, action, source, base, base_volume, price, counter, row.fee, row.fee_currency, comment)

@@ -59,7 +59,7 @@ def process_tx(wallet_address, elem, exporter):
         wallet_address, elem, co.MINTSCAN_LABEL_ORAI, ORAI_NODE)
     
     # Add debug logging
-    logging.info("TxInfo details: hash=%s, timestamp=%s", txinfo.txid, txinfo.timestamp)
+    logging.info("TxInfo details: hash=%s, timestamp=%s, fee=%s, fee_currency=%s", txinfo.txid, txinfo.timestamp, txinfo.fee, txinfo.fee_currency)
     
     # txinfo.url = "https://scan.orai.io/txs/{}".format(txinfo.txid)
     txinfo.url = "https://scanium.io/Oraichain/tx/{}".format(txinfo.txid)
@@ -188,12 +188,17 @@ def _handle_bridge(exporter, txinfo, message, events):
         factory_denom = remote_denom
 
     symbol, decimals = get_token_info(factory_denom)
-    
     total_amount = float(tx_value.get('amount', '0')) / (10 ** decimals)
-    # fee_amount = _parse_amount_currency(tx_value.get('fee_amount', '0'), "orai")
 
     # Create received amount row (total amount)
+    # fee = txinfo.fee
+    # fee_currency = txinfo.fee_currency
+    # TODO ここでtransfer fee in が0になっている。合わせたほうがいいのか？ outはfeeを記録している.
+    # timestamp問題なきがしたのでtransfer fee in はfeeを記録しない
     row = make_transfer_in_tx(txinfo, total_amount, symbol)
+    # row.fee = fee
+    # row.fee_currency = fee_currency
+        
     row.comment = f"Bridge deposit from {remote_denom}"
     exporter.ingest_row(row)
 

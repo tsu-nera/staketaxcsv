@@ -165,6 +165,11 @@ def parse_args(ticker):
             help="Exclude associated token accounts' transactions "
                  "(useful if intractable # of associated accounts)"
         )
+        parser.add_argument(
+            "--before_txid",
+            type=str,
+            help="Only include transactions before this txid",
+        )
 
     args = parser.parse_args()
 
@@ -206,6 +211,8 @@ def parse_args(ticker):
         options["exclude_associated"] = args.exclude_associated
     if "include_tiny_vesting" in args:
         options["include_tiny_vesting"] = args.include_tiny_vesting
+    if "before_txid" in args:
+        options["before_txid"] = args.before_txid
 
     return args.wallet_address, args.format, args.txid, options
 

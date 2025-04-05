@@ -5,7 +5,7 @@ from staketaxcsv.sol.config_sol import localconfig
 SECONDS_PER_TOKEN_ADDRESS = 0.2
 SECONDS_PER_STAKING_ADDRESS = 30
 SECONDS_PER_TX = 0.6
-
+# SECONDS_PER_TX = 5.0
 
 class ProgressSol(Progress):
     def __init__(self):

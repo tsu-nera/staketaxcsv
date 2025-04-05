@@ -7,7 +7,7 @@ ABSOLUTE_MAX_QUERIES = 200
 LIMIT_PER_QUERY = 1000
 
 
-def get_txids(wallet_address, progress, start_date=None, end_date=None):
+def get_txids(wallet_address, progress, start_date=None, end_date=None, before_txid=None):
     exclude_associated = localconfig.exclude_associated
 
     # Sometimes, transactions do not all appear under main wallet address when querying transaction history.
@@ -22,11 +22,11 @@ def get_txids(wallet_address, progress, start_date=None, end_date=None):
         token_accounts = RpcAPI.fetch_token_accounts(wallet_address).keys()
         addresses.extend(token_accounts)
 
-    out = get_txids_for_accounts(addresses, progress, start_date, end_date)
+    out = get_txids_for_accounts(addresses, progress, start_date, end_date, before_txid)
     return out
 
 
-def get_txids_for_accounts(addresses, progress, start_date=None, end_date=None):
+def get_txids_for_accounts(addresses, progress, start_date=None, end_date=None, before_txid=None):
     """ Returns transactions txids for all addresses in one list """
     wallet_address = addresses[0]
 
@@ -44,7 +44,7 @@ def get_txids_for_accounts(addresses, progress, start_date=None, end_date=None):
             max_txs = int(localconfig.limit / 5)
 
         # Get transaction txids for this token account
-        result = _txids_one_account(address, start_date, end_date, max_txs, txids_seen)
+        result = _txids_one_account(address, start_date, end_date, max_txs, txids_seen, before_txid)
         out.extend(result)
 
     # Process oldest first
@@ -52,13 +52,13 @@ def get_txids_for_accounts(addresses, progress, start_date=None, end_date=None):
     return out
 
 
-def _txids_one_account(address, start_date, end_date, max_txs, txids_seen):
+def _txids_one_account(address, start_date, end_date, max_txs, txids_seen, _before_txid=None):
     """ Returns txids for this token account as a list """
     start_ts = _unix_timestamp(start_date + " 00:00:00") if start_date else None
     end_ts = _unix_timestamp(end_date + " 23:59:59") if end_date else None
 
     out = []
-    before_txid = None
+    before_txid = _before_txid
     for j in range(ABSOLUTE_MAX_QUERIES):
         logging.info("query %s for address=%s, before_txid=%s", j, address, before_txid)
         txids, before_txid = RpcAPI.get_txids(address, limit=LIMIT_PER_QUERY, before_txid=before_txid)

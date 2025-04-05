@@ -8,3 +8,4 @@ class localconfig(config):
     end_date = None
     exclude_failed = False      # exclude failed transactions
     exclude_associated = False  # exclude associated token accounts' transactions
+    before_txid = None

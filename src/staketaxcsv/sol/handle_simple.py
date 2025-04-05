@@ -5,8 +5,9 @@ from staketaxcsv.common.ExporterTypes import (
     TX_TYPE_SOL_STAKING_SPLIT,
     TX_TYPE_SOL_STAKING_WITHDRAW,
     TX_TYPE_STAKING_DELEGATE,
+    TX_TYPE_TRANSFER,
 )
-from staketaxcsv.common.make_tx import make_simple_tx, make_spend_fee_tx, make_unknown_tx, make_unknown_tx_with_transfer
+from staketaxcsv.common.make_tx import make_simple_tx, make_spend_fee_tx, make_unknown_tx, make_unknown_tx_with_transfer, make_reward_tx
 from staketaxcsv.sol.constants import (
     INSTRUCTION_TYPE_CREATE_ACCOUNT_WITH_SEED,
     INSTRUCTION_TYPE_DEACTIVATE,
@@ -58,11 +59,17 @@ def handle_unknown(exporter, txinfo):
 def _handle_generic(exporter, txinfo, tx_type):
     fee = staketaxcsv.sol.util_sol.calculate_fee(txinfo)
 
-    row = make_spend_fee_tx(txinfo, fee, txinfo.fee_currency)
-    row.fee = ""
-    row.fee_currency = ""
-    row.comment = "fee for {}".format(tx_type)
-    exporter.ingest_row(row)
+    if txinfo.recieved_amount > 0:
+        row = make_reward_tx(txinfo, txinfo.recieved_amount, txinfo.recieved_currency)
+        row.tx_type = TX_TYPE_TRANSFER
+        row.comment = "return for close account"
+        exporter.ingest_row(row)
+    else:
+        row = make_spend_fee_tx(txinfo, fee, txinfo.fee_currency)
+        row.fee = ""
+        row.fee_currency = ""
+        row.comment = "fee for {}".format(tx_type)
+        exporter.ingest_row(row)
 
     return row
 

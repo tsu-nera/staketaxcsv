@@ -6,6 +6,7 @@ Prints transactions and writes CSV(s) to _reports/SOL*.csv
 
 import logging
 import pprint
+import time
 
 
 import staketaxcsv.sol.processor
@@ -36,6 +37,7 @@ def read_options(options):
     localconfig.end_date = options.get("end_date", None)
     localconfig.exclude_failed = options.get("exclude_failed", localconfig.exclude_failed)
     localconfig.exclude_associated = options.get("exclude_associated", localconfig.exclude_associated)
+    localconfig.before_txid = options.get("before_txid", localconfig.before_txid)
     logging.info("localconfig: %s", localconfig.__dict__)
 
 
@@ -90,7 +92,7 @@ def estimate_duration(wallet_address):
 def txhistory(wallet_address):
     logging.info("Using SOLANA_URL=%s...", SOL_NODE)
     start_date, end_date = localconfig.start_date, localconfig.end_date
-
+    before_txid = localconfig.before_txid
     progress = ProgressSol()
     exporter = Exporter(wallet_address, localconfig, TICKER_SOL)
     wallet_info = WalletInfo(wallet_address)
@@ -98,7 +100,7 @@ def txhistory(wallet_address):
     # ####### Fetch data to so that job progress can be estimated ##########
 
     # Fetch transaction ids for wallet
-    txids = get_txids(wallet_address, progress, start_date, end_date)
+    txids = get_txids(wallet_address, progress, start_date, end_date, before_txid)
 
     # Fetch current staking addresses for wallet
     progress.report_message("Fetching staking addresses...")
@@ -111,7 +113,7 @@ def txhistory(wallet_address):
     ########################################################################
 
     # Transactions data
-    _fetch_and_process_txs(txids, wallet_info, exporter, progress)
+    _fetch_and_process_txs(txids, wallet_info, exporter, progress, sleep_seconds=SECONDS_PER_TX)
 
     # Update progress indicator
     progress.update_estimate(len(wallet_info.get_staking_addresses()))
@@ -133,7 +135,7 @@ def txhistory(wallet_address):
     return exporter
 
 
-def _fetch_and_process_txs(txids, wallet_info, exporter, progress=None):
+def _fetch_and_process_txs(txids, wallet_info, exporter, progress=None, sleep_seconds=5):
     total_count = len(txids)
 
     for i, txid in enumerate(txids):
@@ -144,6 +146,9 @@ def _fetch_and_process_txs(txids, wallet_info, exporter, progress=None):
             # Update progress to db every so often for user
             message = f"Fetched {i + 1} of {total_count} transactions"
             progress.report(i, message, "txs")
+        
+        if sleep_seconds:
+            time.sleep(sleep_seconds)
 
     if progress:
         message = f"Finished fetching {total_count} transactions"
